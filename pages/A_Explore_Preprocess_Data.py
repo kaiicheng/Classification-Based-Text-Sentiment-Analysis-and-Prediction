@@ -31,18 +31,13 @@ def remove_punctuation(df, features):
     Output: 
         - df: dataframe with updated feature with removed punctuation
     """
-    # Add code here
     translator = str.maketrans('', '', string.punctuation)
-    
     for feature_name in features:
-        # Check if the feature contains strings
+        # check if the feature contains string or not
         if df[feature_name].dtype == 'object':
-            # Use the translator to remove punctuation using a lambda function
-            df[feature_name] = df[feature_name].apply(lambda x: x.translate(translator))
-    
-    # Store the updated dataframe in Streamlit's session state
-    st.session_state['data'] = df
-
+            # applying translate method eliminating punctuations
+            df[feature_name] = df[feature_name].apply(
+                lambda x: x.translate(translator) if isinstance(x, str) else x)
 
     # Confirmation statement
     st.write('Punctuation was removed from {}'.format(features))
@@ -64,52 +59,20 @@ def word_count_encoder(df, feature, analyzer='word', ngram_range=(1, 1), stop_wo
         - count_vect: CountVectorizer
         - word_count_df: pandas dataframe with prefix 'word_count_'
     """
-    count_vect=None
-    word_count_df=None
     # Create CountVectorizer object using analyzer, ngram_range, and stop_words
     count_vect = CountVectorizer(analyzer=analyzer, ngram_range=ngram_range, stop_words=stop_words)
-    word_counts = count_vect.fit_transform(df[feature])
-
-    # Add code here
-    # Ensure the feature exists in the dataframe
-    word_count_df = pd.DataFrame(word_counts.toarray())
+    X_train_counts = count_vect.fit_transform(df[feature])
+    word_count_df = pd.DataFrame(X_train_counts.toarray())
     word_count_df = word_count_df.add_prefix('word_count_')
-    for column in word_count_df.columns:
-        if column in df.columns:
-            df.drop(columns=[column], inplace=True)
-
-    return df, count_vect, word_count_df
-
-    #Old version
-    '''
-    if feature not in df.columns:
-        st.write(f"Feature '{feature}' not found in DataFrame.")
-        return df, None, None
-
-    # Create CountVectorizer object using the specified parameters
-    count_vect = CountVectorizer(analyzer=analyzer, ngram_range=ngram_range, stop_words=stop_words)
     
-    # Fit and transform the specified feature to create frequency counts for words
-    word_counts = count_vect.fit_transform(df[feature])
-    
-    # Convert the frequency counts to an array and then to a pandas dataframe
-    # Columns are named sequentially as per the test expectation
-    word_count_df = pd.DataFrame(word_counts.toarray())
-    word_count_df.columns = [f'word_count_{i}' for i in range(word_count_df.shape[1])]
-    
-    # Concatenate the original DataFrame with the new word count DataFrame
-    df = pd.concat([df.reset_index(drop=True), word_count_df.reset_index(drop=True)], axis=1)
+    # Show confirmation statement
+    st.write('Feature {} has been word count encoded from {} reviews.'.format(
+        feature, len(word_count_df)))
 
-    # Optionally, store the updated dataframe in Streamlit's session state for app interactivity
+    # Store new features in st.session_state
     st.session_state['data'] = df
 
-     # Confirmation statement showing the number of new features added
-    st.write('Word count encoding applied. {} new features were added.'.format(word_count_df.shape[1]))
-
-
     return df, count_vect, word_count_df
-    '''
-    
 
 # Checkpoint 3
 def tf_idf_encoder(df, feature, analyzer='word', ngram_range=(1, 1), stop_words=None, norm=None):
@@ -129,42 +92,18 @@ def tf_idf_encoder(df, feature, analyzer='word', ngram_range=(1, 1), stop_words=
         - tfidf_transformer: TfidfTransformer with normalization in norm
         - tfidf_df: pandas dataframe with prefix 'tf_idf_word_count_'
     """
-    count_vect=None
-    tfidf_transformer=None
-    tfidf_df=None
     # Create CountVectorizer object using analyzer, ngram_range, and stop_words
-    # Add code here
-    # Ensure the feature exists in the dataframe
-    if feature not in df.columns:
-        st.write(f"Feature '{feature}' not found in DataFrame.")
-        return df, None, None, None
-
-    # Create CountVectorizer object using the specified parameters
     count_vect = CountVectorizer(analyzer=analyzer, ngram_range=ngram_range, stop_words=stop_words)
-    
-    # Use the CountVectorizer to transform the feature in df to create frequency counts for words
-    word_counts = count_vect.fit_transform(df[feature])
-    
-    # Create TfidfTransformer object with the specified normalization
-    tfidf_transformer = TfidfTransformer(norm=norm)
-    
-    # Transform the frequency counts into TF-IDF features
-    tfidf_features = tfidf_transformer.fit_transform(word_counts)
-    
-    # Convert the TF-IDF features to an array and then to a pandas dataframe
-    # Columns are named sequentially as per the test expectation
-    tfidf_df = pd.DataFrame(tfidf_features.toarray())
-    tfidf_df.columns = [f'tf_idf_word_count_{i}' for i in range(tfidf_df.shape[1])]
-    
-    # Add the TF-IDF dataframe to df using the pd.concat() function
-    df = pd.concat([df.reset_index(drop=True), tfidf_df.reset_index(drop=True)], axis=1)
-
-    
-
 
     # Create TfidfTransformer object
-    # Add code here
+    tfidf_transformer = TfidfTransformer(norm=norm)
 
+    X_train_counts = count_vect.fit_transform(df[feature])
+    #tfidf_feature_names = np.array(count_vect.get_feature_names_out())
+    X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
+    tfidf_df = pd.DataFrame(X_train_tfidf.toarray())
+    tfidf_df = tfidf_df.add_prefix('tf_idf_word_count_')
+    
     # Show confirmation statement
     st.write(
         'Feature {} has been TF-IDF encoded from {} reviews.'.format(feature, len(tfidf_df)))

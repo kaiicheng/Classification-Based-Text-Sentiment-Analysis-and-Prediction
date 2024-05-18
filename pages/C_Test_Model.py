@@ -33,12 +33,16 @@ def compute_accuracy(prediction_labels, true_labels):
     Output
         - accuracy (float): accuracy percentage (0-100%)
     '''
+    # Linearize inputs into column vectors
+    prediction_labels = np.array(prediction_labels).reshape(-1,1)
+    true_labels = true_labels.reshape(-1,1)
 
-    correct_predictions = (prediction_labels == true_labels).sum()
-    total_predictions = len(true_labels)
-    accuracy = (correct_predictions / total_predictions)  # Now returns a value between 0 and 1
+    # Compute the number of correctly classified examples
+    num_correct = np.sum(prediction_labels == true_labels)
+
+    # Then compute accuracy by dividing num_correct by total number of examples
+    accuracy = num_correct / len(true_labels)
     return accuracy
-
 
 # Checkpoint 13
 def compute_precison_recall(prediction_labels, true_labels, print_summary=False):
@@ -51,27 +55,22 @@ def compute_precison_recall(prediction_labels, true_labels, print_summary=False)
         - precision (float): precision score = TP/TP+FP
         - recall (float): recall score = TP/TP+FN
     '''
-    # precision=0
-    # recall=0
-    # # Add code here
-    # return precision, recall
+    # Linearize inputs into column vectors
+    prediction_labels = np.array(prediction_labels).reshape(-1,1)
+    true_labels = true_labels.reshape(-1,1)
 
+    cmatrix = confusion_matrix(true_labels, prediction_labels)
+    true_neg, false_pos, false_neg, true_pos = cmatrix.ravel()
+
+    if(print_summary):
+        st.write('The number of true positives: {}'.format(true_neg))
+        st.write('The number of false positives: {}'.format(false_pos))
+        st.write('The number of false negatives: {}'.format(false_neg))
+        st.write('The number of true positives: {}'.format(true_pos))
     
-    # True Positives (TP): The model correctly predicts the positive class
-    TP = sum((prediction_labels == 1) & (true_labels == 1))
-    
-    # False Positives (FP): The model incorrectly predicts the positive class
-    FP = sum((prediction_labels == 1) & (true_labels == 0))
-    
-    # False Negatives (FN): The model incorrectly predicts the negative class
-    FN = sum((prediction_labels == 0) & (true_labels == 1))
-    
-    # Calculate Precision
-    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    
-    # Calculate Recall
-    recall = TP / (TP + FN) if (TP + FN) > 0 else 0
-    
+    precision = true_pos/(true_pos + false_pos) if true_pos + false_pos > 0 else 0
+    recall = true_pos / (true_pos + false_neg) if true_pos + false_neg > 0 else 0
+
     return precision, recall
 
 # Helper Function
@@ -96,7 +95,7 @@ def compute_eval_metrics(X, y_true, model, metrics, print_summary=False):
     y_pred = model.predict(X)
 
     # Compute the evaluation metrics in 'metrics = ['precision', 'recall', 'accuracy']' using the predicted sentiment
-    precision, recall = compute_precison_recall(y_pred, y_true.to_numpy())
+    precision, recall = compute_precison_recall(y_pred, y_true.to_numpy())#, print_summary=print_summary)
     accuracy = compute_accuracy(y_pred, y_true.to_numpy())
 
     if 'precision' in metrics:

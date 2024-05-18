@@ -24,7 +24,7 @@ st.title('Train Model')
 
 #############################################
 
-# Checkpoint 4
+# Checkpoint 1
 def split_dataset(df, number, target, feature_encoding, random_state=42):
     """
     This function splits the dataset into the training and test sets.
@@ -42,71 +42,58 @@ def split_dataset(df, number, target, feature_encoding, random_state=42):
         - y_train: training targets
         - y_val: test/validation targets
     """
-    # X_train = []
-    # X_val = []
-    # y_train = []
-    # y_val = []
-    # X_train_sentiment, X_val_sentiment = [], []
-    # Separate features and target
-    X = df.drop(columns=[target])
-    y = df[target]
-    
-    # Split the dataset into training and validation sets
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=number/100, random_state=random_state)
-    
-    # Filter the features based on encoding type
-    if 'Word Count' in feature_encoding:
-        X_train_sentiment = X_train.filter(regex='^word_count_')
-        X_val_sentiment = X_val.filter(regex='^word_count_')
-    elif 'TF-IDF' in feature_encoding:
-        X_train_sentiment = X_train.filter(regex='^tf_idf_word_count_')
-        X_val_sentiment = X_val.filter(regex='^tf_idf_word_count_')
-    else:
-        raise ValueError("Invalid feature encoding specified. Please use 'Word Count' or 'TF-IDF'.")
+    X_train = []
+    X_val = []
+    y_train = []
+    y_val = []
 
-    # Add code here
+    X_train_sentiment, X_val_sentiment = [], []
+    try:
+        X, y = df.loc[:, ~df.columns.isin(
+            [target])], df.loc[:, df.columns.isin([target])]
+
+        # Split the train and test sets into X_train, X_val, y_train, y_val using X, y, number/100, and random_state
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=number/100, random_state=random_state)
+
+        # Use the column word_count as a feature and the column sentiment as the target
+        if (feature_encoding == 'TF-IDF'):
+            X_train_sentiment = X_train.loc[:, X_train.columns.str.startswith('tf_idf_word_count_')]
+            X_val_sentiment = X_val.loc[:, X_val.columns.str.startswith('tf_idf_word_count_')]
+        elif (feature_encoding == 'Word Count'):
+            X_train_sentiment = X_train.loc[:, X_train.columns.str.startswith('word_count_')]
+            X_val_sentiment = X_val.loc[:, X_val.columns.str.startswith('word_count_')]
+        else:
+            st.write('Invalid feature encoding provided in split_dataset')
+
+        # Compute dataset percentages
+        train_percentage = (len(X_train) /
+                            (len(X_train)+len(X_val)))*100
+        test_percentage = (len(X_val) /
+                           (len(X_train)+len(X_val)))*100
+
+        # Print dataset split result
+        st.markdown('The training dataset contains {0:.2f} observations ({1:.2f}%) and the test dataset contains {2:.2f} observations ({3:.2f}%).'.format(len(X_train),
+                                                                                                                                                          train_percentage,
+                                                                                                                                                          len(
+                                                                                                                                                              X_val),
+                                                                                                                                                          test_percentage))
+
+        # Save train and test split to st.session_state
+        st.session_state['X_train'] = X_train_sentiment
+        st.session_state['X_val'] = X_val_sentiment
+        st.session_state['y_train'] = y_train
+        st.session_state['y_val'] = y_val
+    except:
+        print('Exception thrown; testing test size to 0')
     return X_train_sentiment, X_val_sentiment, y_train, y_val
 
+# Checkpoint 5
 class LogisticRegression(object):
     def __init__(self, learning_rate=0.001, num_iterations=500): 
         self.learning_rate = learning_rate 
         self.num_iterations = num_iterations 
         self.likelihood_history=[]
-        self.W = None  
-        self.b = 0     
-        self.X = None  
-        self.Y = None
-
-    def sigmoid(self, z):
-        """
-        Applies the sigmoid function to compute probabilities.
-        """
-        return 1 / (1 + np.exp(-z))
-
-    def fit(self, X, y):
-        """
-        Fits the logistic regression model to the training data.
-        """
-        n_samples, n_features = X.shape
-        self.W = np.zeros(n_features)  # Initialize weights to zeros
-        self.X = X  # Set features
-        self.Y = y
-
-        for _ in range(self.num_iterations):
-            linear_model = np.dot(X, self.W) + self.b
-            y_predicted = self.sigmoid(linear_model)
-
-            # Gradient computation
-            dw = (1 / n_samples) * np.dot(X.T, (y_predicted - y))
-            db = (1 / n_samples) * np.sum(y_predicted - y)
-
-            # Update weights and bias
-            self.W -= self.learning_rate * dw
-            self.b -= self.learning_rate * db
-            self.update_weights()
-
-    
     
     # Checkpoint 5
     def predict_probability(self, X):
@@ -120,15 +107,13 @@ class LogisticRegression(object):
         Output:
             - y_pred: probability of positive product review
         '''
-        # y_pred=None
         # Take dot product of feature_matrix and coefficients  
-        # Add code here
+        score = np.dot(X, self.W) + self.b
         
         # Compute P(y_i = +1 | x_i, w) using the link function
-        # Add code here 
-        scores = np.dot(X, self.W) + self.b  
-        y_pred = self.sigmoid(scores)
-         
+        #y_pred = 1. / (1.+np.exp(-score)) + self.b  # this is a bug
+        y_pred = 1. / (1.+np.exp(-score)) 
+
         return y_pred
     
     # Checkpoint 6
@@ -143,21 +128,15 @@ class LogisticRegression(object):
         Output
             - lp: log likelihood estimation
         '''
-        lp=None
-        # Add code here
-      
-        def sigmoid(scores):
-            return 1 / (1 + np.exp(-scores))
+        indicator = (Y==+1)
+        scores = np.dot(X, W) 
+        logexp = np.log(1. + np.exp(-scores))
         
-        # Compute the scores by taking the dot product of X and W
-        scores = np.dot(X, W)
+        # Simple check to prevent overflow
+        mask = np.isinf(logexp)
+        logexp[mask] = -scores[mask]
         
-        # Calculate the log-likelihood
-        log_likelihood = Y * np.log(sigmoid(scores)) + (1 - Y) * np.log(1 - sigmoid(scores))
-        
-        # Compute the average log-likelihood
-        lp = np.mean(log_likelihood)
-        
+        lp = np.sum((indicator-1)*scores - logexp)/len(X)
         return lp
     
     # Checkpoint 7
@@ -169,31 +148,28 @@ class LogisticRegression(object):
         Inputs: None
         Output: None
         '''
-        # Step 1: Make a prediction using the predict_probability function
-        predictions = self.predict(self.X)
-        
-        # Ensure predictions and Y are numpy arrays for safe operations
-        predictions = np.array(predictions)
-        Y = np.array(self.Y)
-        
-        # Step 2: Compute the error
-        error = Y - predictions
-        
-        # Step 3: Compute the derivative dW and db
-        dW = np.dot(self.X.T, error) / len(self.X)
-        db = np.sum(error) / len(self.X)
-        
-        # Step 4: Update weights and bias
-        self.W += self.learning_rate * dW
-        self.b += self.learning_rate * db
-        
-        # Step 5: Compute the log likelihood and add it to self.likelihood_history
-        log_likelihood = np.sum(Y * np.log(predictions + 1e-9) + (1 - Y) * np.log1p(-predictions))
-        self.likelihood_history.append(log_likelihood / len(self.X))
-        
-        return self
-        
-        
+        try:
+            # Make a prediction
+            y_pred = self.predict(self.X)
+
+            # Bug
+            #dW = self.X.T.dot(self.Y-y_pred) / self.num_features 
+            #db = np.sum(self.Y-y_pred) / self.num_features 
+
+            dW = self.X.T.dot(self.Y-y_pred) / self.num_examples 
+            db = np.sum(self.Y-y_pred) / self.num_examples 
+
+            # update weights and bias
+            self.b = self.b + self.learning_rate * db
+            self.W = self.W + self.learning_rate * dW
+
+            log_likelihood=0
+            # Compute log-likelihood
+            log_likelihood += self.compute_avg_log_likelihood(self.X, self.Y, self.W)
+            self.likelihood_history.append(log_likelihood)
+        except ValueError as err:
+                st.write({str(err)})
+    
     # Checkpoint 8
     def predict(self, X):
         '''
@@ -205,15 +181,13 @@ class LogisticRegression(object):
         Output:
             - Y: list of predicted classes 
         '''
-
-        # Step 1: Compute the sigmoid z-scores of the input features
-        scores = np.dot(X, self.W) + self.b
-        z_scores = 1 / (1 + np.exp(-scores))
-        
-        # Step 2: Make a prediction using the z-scores
-        y_pred = [-1 if z <= 0.5 else +1 for z in z_scores]
-
-        return y_pred
+        y_pred=0
+        try:
+            scores = 1 / (1 + np.exp(- (X.dot(self.W) + self.b)))
+            y_pred = [-1 if z <= 0.5 else +1 for z in scores]
+        except ValueError as err:
+                st.write({str(err)})
+        return y_pred 
     
     # Checkpoint 9
     def fit(self, X, Y):   
@@ -224,21 +198,27 @@ class LogisticRegression(object):
             - Y: list of actual product sentiment classes 
             - num_iterations: # of iterations to update weights using gradient ascent
             - learning_rate: learning rate
-        Output: None
+        Output:
+            - W: predicted weights
+            - b: predicted bias
+            - likelihood_history: history of log likelihood
         '''
-        # Add code here
+        # no_of_training_examples, no_of_features         
+        self.num_examples, self.num_features = X.shape    
+        
+        # weight initialization         
+        self.W = np.zeros(self.num_features)
         self.X = X
         self.Y = Y
-        n_features = X.shape[1]
-        self.W = np.zeros(n_features)
         self.b = 0
-        self.likelihood_history = []
-
-        for _ in range(self.num_iterations):
-            self.update_weights()
-
-        return self
-        #return self
+        self.likelihood_history=[]
+        
+        # gradient ascent learning 
+        try:
+            for _ in range(self.num_iterations):          
+                self.update_weights()   
+        except ValueError as err:
+                st.write({str(err)})
 
     # Checkpoint 10
     def get_weights(self, model_name):
@@ -252,20 +232,23 @@ class LogisticRegression(object):
             - 'Logistic Regression'
             - 'Stochastic Gradient Ascent with Logistic Regression'
         '''
-
-        out_dict = {
-            'Logistic Regression': self.W,  # Directly return the weight array for Logistic Regression
-            'Stochastic Gradient Ascent with Logistic Regression': []  # Placeholder for future implementation
-        }
-        
-        if 'Logistic Regression' in model_name:
-            positive_weights = np.sum(self.W > 0)
-            negative_weights = np.sum(self.W < 0)
-            print('Logistic Regression - Positive Weights:', positive_weights, 'Negative Weights:', negative_weights)
-
+        out_dict = {'Logistic Regression': [],
+                    'Stochastic Gradient Ascent with Logistic Regression': []}
+        try:
+            # set weight for given model_name
+            W = np.array([f for f in self.W])
+            out_dict[model_name] = self.W
+            # Print Coefficients
+            st.write('-------------------------')
+            st.write('Model Coefficients for '+model_name)
+            num_positive_weights = np.sum(W >= 0)
+            num_negative_weights = np.sum(W < 0)
+            st.write('* Number of positive weights: {}'.format(num_positive_weights))
+            st.write('* Number of negative weights: {}'.format(num_negative_weights))
+        except ValueError as err:
+            st.write({str(err)})
         return out_dict
 
-    
 class StochasticLogisticRegression(LogisticRegression):
     def __init__(self, num_iterations, learning_rate, batch_size): 
         self.likelihood_history=[]
@@ -284,47 +267,67 @@ class StochasticLogisticRegression(LogisticRegression):
             - Y: target variable (product sentiment)
         Output: None
         '''
-        # Initialize model parameters
-        self.num_examples, self.num_features = X.shape
-        self.b = 0
+        self.likelihood_history=[]
+
+        # no_of_training_examples, no_of_features         
+        self.num_examples, self.num_features = X.shape   
+        
+        # make sure it's a numpy array
         self.W = np.zeros(self.num_features)
-        self.X, self.Y = X, Y
 
-        # Shuffle the dataset
-        permutation = np.random.permutation(self.num_examples)
-        feature_matrix = self.X[permutation, :]
-        sentiment = self.Y[permutation]
-
-        # Initialize batch index
-        i = 0
+        # Shuffle the data before starting
+        permutation = np.random.permutation(len(X))
+    
+        # Initialize features, target, and bias
+        self.X = X[permutation,:]
+        self.Y = Y[permutation]
+        self.b=0
+        
+        i = 0 # index of current batch
+        # Do a linear scan over data
         for itr in range(self.num_iterations):
-            # Predict probabilities for the current batch
-            predictions = self.predict_probability(feature_matrix[i:i + self.batch_size, :])
-
-            # Compute indicator function for positive sentiment
-            indicator = (sentiment[i:i + self.batch_size] == +1)
-
-            # Compute errors between predicted probabilities and true labels
+            # Predict P(y_i = +1|x_i,w) using your predict_probability() function
+            # Make sure to slice the i-th row of X with [i:i+batch_size,:]
+            predictions = self.predict_probability(self.X[i:i+self.batch_size,:])
+            
+            # Compute indicator value for (y_i = +1)
+            # Make sure to slice the i-th entry with [i:i+batch_size]
+            indicator = (self.Y[i:i+self.batch_size]==+1)
+            
+            # Compute the errors as indicator - predictions
             errors = indicator - predictions
+            
+            for j in range(len(self.W)): # loop over each coefficient
+                # Recall that X[:,j] is the feature column associated with coefficients[j]
+                # Compute the derivative for coefficients[j] and save it to dW.
+                # Make sure to slice the i-th row of X with [i:i+batch_size,j]
+                dW = errors.dot(self.X[i:i+self.batch_size,j].T)
+                
+                # compute the product of the step size, the derivative, and the **normalization constant** (1./batch_size)
+                self.W[j] += self.learning_rate * dW 
+            
+            # Checking whether log likelihood is increasing
+            # Print the log likelihood over the *current batch*
+            lp = self.compute_avg_log_likelihood(self.X[i:i+self.batch_size,:], self.Y[i:i+self.batch_size], self.W)
 
-            # Update weights using stochastic gradient ascent
-            for j in range(len(self.W)):
-                dW = errors.dot(feature_matrix[i:i + self.batch_size, j].T)
-                self.W[j] += self.learning_rate * dW
-
-            # Move the batch window forward
+            self.likelihood_history.append(lp)
+            if itr <= 15 or (itr <= 1000 and itr % 100 == 0) or (itr <= 10000 and itr % 1000 == 0) \
+            or itr % 10000 == 0 or itr == self.num_iterations-1:
+                data_size = len(X)
+                print('Iteration %*d: Average log likelihood (of data points in batch [%0*d:%0*d]) = %.8f' % \
+                    (int(np.ceil(np.log10(self.num_iterations))), itr, \
+                    int(np.ceil(np.log10(data_size))), i, \
+                    int(np.ceil(np.log10(data_size))), i+self.batch_size, lp))
+            
+            # if we made a complete pass over data, shuffle and restart
             i += self.batch_size
-            if i + self.batch_size > self.num_examples:
-                # Reshuffle the dataset when the end is reached within an iteration
-                permutation = np.random.permutation(self.num_examples)
-                feature_matrix = feature_matrix[permutation, :]
-                sentiment = sentiment[permutation]
+            if i+self.batch_size > len(self.X):
+                permutation = np.random.permutation(len(self.X))
+                self.X = self.X[permutation,:]
+                self.Y = self.Y[permutation]
                 i = 0
-
-            # Update the learning rate using a decay factor
-            self.learning_rate /= 1.02
-
-        return self
+            # Learning rate schedule
+            self.learning_rate = self.learning_rate/1.02
 
 ###################### FETCH DATASET #######################
 df = None
